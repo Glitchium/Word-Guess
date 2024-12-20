@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Interactive Word Game</title>
     <style>
-        /* General styling */
         body {
             margin: 0;
             display: flex;
@@ -179,31 +178,42 @@
                 wordElement.textContent = letter;
                 wordElement.setAttribute('data-letter', letter);
 
-                wordElement.addEventListener('mousedown', (e) => {
-                    isDragging = true;
-                    draggedWord = wordElement;
-                    offsetX = e.clientX - wordElement.getBoundingClientRect().left;
-                    offsetY = e.clientY - wordElement.getBoundingClientRect().top;
-
-                    wordElement.style.position = 'absolute';  // Make the word float
-                    wordElement.style.zIndex = '1000';  // Bring the word to the front
-                    wordElement.style.userSelect = 'none';  // Prevent text selection
-                });
+                wordElement.addEventListener('mousedown', startDrag);
+                wordElement.addEventListener('touchstart', startDrag);
 
                 wordContainer.appendChild(wordElement);
             });
         }
 
-        // Listen for mouse events to start dragging
-        document.addEventListener('mousemove', (e) => {
-            if (isDragging && draggedWord) {
-                draggedWord.style.left = `${e.clientX - offsetX}px`;
-                draggedWord.style.top = `${e.clientY - offsetY}px`;
-            }
-        });
+        function startDrag(e) {
+            e.preventDefault(); // Prevent any default actions (like text selection)
 
-        // Stop dragging the word
-        document.addEventListener('mouseup', () => {
+            isDragging = true;
+            draggedWord = e.target;
+            offsetX = e.clientX ? e.clientX - draggedWord.getBoundingClientRect().left : e.touches[0].clientX - draggedWord.getBoundingClientRect().left;
+            offsetY = e.clientY ? e.clientY - draggedWord.getBoundingClientRect().top : e.touches[0].clientY - draggedWord.getBoundingClientRect().top;
+
+            draggedWord.style.position = 'absolute';  // Make the word float
+            draggedWord.style.zIndex = '1000';  // Bring the word to the front
+            draggedWord.style.userSelect = 'none';  // Prevent text selection
+
+            document.addEventListener('mousemove', dragMove);
+            document.addEventListener('touchmove', dragMove);
+
+            document.addEventListener('mouseup', stopDrag);
+            document.addEventListener('touchend', stopDrag);
+        }
+
+        function dragMove(e) {
+            if (isDragging && draggedWord) {
+                const clientX = e.clientX || e.touches[0].clientX;
+                const clientY = e.clientY || e.touches[0].clientY;
+                draggedWord.style.left = `${clientX - offsetX}px`;
+                draggedWord.style.top = `${clientY - offsetY}px`;
+            }
+        }
+
+        function stopDrag() {
             if (isDragging && draggedWord) {
                 isDragging = false;
 
@@ -240,8 +250,12 @@
                 // Reset the word's position and z-index
                 draggedWord.style.position = '';
                 draggedWord.style.zIndex = '';
+                document.removeEventListener('mousemove', dragMove);
+                document.removeEventListener('touchmove', dragMove);
+                document.removeEventListener('mouseup', stopDrag);
+                document.removeEventListener('touchend', stopDrag);
             }
-        });
+        }
 
         // Check the word
         function checkWord() {
