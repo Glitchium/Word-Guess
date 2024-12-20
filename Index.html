@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Word Game</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: black;
+            font-family: Arial, sans-serif;
+        }
+        .title {
+            color: white;
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            transition: opacity 0.5s ease;
+            z-index: 10;
+            position: absolute;
+            top: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .square {
+            width: 100px;
+            height: 100px;
+            background-color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2rem;
+            transition: background-color 0.3s ease;
+            position: relative;
+        }
+        .words {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        .word {
+            padding: 10px;
+            background-color: white;
+            border: 1px solid black;
+            cursor: grab;
+            user-select: none;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            font-size: 2rem;
+        }
+        .word:active {
+            transform: scale(1.1);
+            opacity: 0.7;
+        }
+        .fullscreen-word {
+            display: none;
+            color: white;
+            font-size: 6rem;
+            text-align: center;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 5;
+        }
+        .correct {
+            background-color: green !important;
+        }
+        .wrong {
+            background-color: red !important;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="title" id="title">GÆT ORDET</div>
+    <div class="container">
+        <div class="square" data-index="0"></div>
+        <div class="square" data-index="1"></div>
+        <div class="square" data-index="2"></div>
+        <div class="square" data-index="3"></div>
+        <div class="square" data-index="4"></div>
+    </div>
+    <div class="words" id="word-container">
+        <!-- Words will be dynamically inserted here -->
+    </div>
+    <div class="fullscreen-word" id="fullscreen-word">
+        <div id="result-word"></div>
+    </div>
+
+    <script>
+        const squares = document.querySelectorAll('.square');
+        const title = document.getElementById('title');
+        const fullscreenWord = document.getElementById('fullscreen-word');
+        const resultWord = document.getElementById('result-word');
+        const wordContainer = document.getElementById('word-container');
+
+        const wordList = ['Å', 'R', 'H', 'U', 'S', 'O', 'P', 'L', 'E'];  // Added extra words for variety
+
+        let currentWord = '';
+        let currentLetters = [];
+
+        let isDragging = false;
+        let draggedWord = null;
+        let offsetX = 0;
+        let offsetY = 0;
+
+        // Shuffle function (Fisher-Yates algorithm)
+        function shuffleArray(arr) {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]]; // Swap elements
+            }
+        }
+
+        // Create the words dynamically after shuffling
+        function createWords() {
+            shuffleArray(wordList);  // Shuffle the words
+
+            // Clear the container before inserting new words
+            wordContainer.innerHTML = '';
+
+            wordList.forEach(letter => {
+                const wordElement = document.createElement('div');
+                wordElement.classList.add('word');
+                wordElement.textContent = letter;
+                wordElement.setAttribute('data-letter', letter);
+
+                wordElement.addEventListener('mousedown', (e) => {
+                    isDragging = true;
+                    draggedWord = wordElement;
+                    offsetX = e.clientX - wordElement.getBoundingClientRect().left;
+                    offsetY = e.clientY - wordElement.getBoundingClientRect().top;
+
+                    wordElement.style.position = 'absolute';  // Make the word float
+                    wordElement.style.zIndex = '1000';  // Bring the word to the front
+                    wordElement.style.userSelect = 'none';  // Prevent text selection
+                });
+
+                wordContainer.appendChild(wordElement);
+            });
+        }
+
+        // Listen for mouse events to start dragging
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging && draggedWord) {
+                draggedWord.style.left = `${e.clientX - offsetX}px`;
+                draggedWord.style.top = `${e.clientY - offsetY}px`;
+            }
+        });
+
+        // Stop dragging the word
+        document.addEventListener('mouseup', () => {
+            if (isDragging && draggedWord) {
+                isDragging = false;
+
+                // Check if the dragged word is over a square
+                squares.forEach(square => {
+                    const squareRect = square.getBoundingClientRect();
+                    const wordRect = draggedWord.getBoundingClientRect();
+
+                    if (
+                        wordRect.left >= squareRect.left &&
+                        wordRect.right <= squareRect.right &&
+                        wordRect.top >= squareRect.top &&
+                        wordRect.bottom <= squareRect.bottom
+                    ) {
+                        // If the square already contains a word, swap them
+                        if (square.textContent) {
+                            const existingWord = square.textContent;
+                            const existingWordElement = document.querySelector(`.word[data-letter='${existingWord}']`);
+                            existingWordElement.textContent = draggedWord.textContent;
+                        }
+
+                        // Place the dragged word in the square
+                        square.textContent = draggedWord.textContent;
+
+                        currentWord = [...squares].map(square => square.textContent).join('');
+                        currentLetters.push(draggedWord.textContent);
+
+                        // Remove the dragged word from the list of draggable words
+                        draggedWord.remove();
+                        checkWord();
+                    }
+                });
+
+                // Reset the word's position and z-index
+                draggedWord.style.position = '';
+                draggedWord.style.zIndex = '';
+            }
+        });
+
+        // Check the word
+        function checkWord() {
+            const targetWord = 'ÅRHUS';
+            const allFilled = [...squares].every(square => square.textContent);
+
+            if (allFilled) {
+                if (currentWord === targetWord) {
+                    squares.forEach(square => {
+                        square.classList.add('hidden');  // Hide the squares and words
+                    });
+                    fullscreenWord.style.display = 'block';  // Show the full word
+                    resultWord.textContent = targetWord;
+                    title.textContent = 'ORDET VAR'; // Update title to say just "ORDET VAR"
+                    title.style.opacity = '1'; // Make the title visible
+                    fullscreenWord.style.zIndex = '10';  // Bring the guessed word to the front
+                    fullscreenWord.style.fontSize = '8rem';  // Increase the font size of the guessed word
+
+                    // Hide remaining words in the word container
+                    const words = document.querySelectorAll('.word');
+                    words.forEach(word => word.style.display = 'none'); // Hide remaining words
+                } else {
+                    squares.forEach(square => square.classList.add('wrong'));
+                    setTimeout(resetGame, 1000);
+                }
+            }
+        }
+
+        // Reset the game
+        function resetGame() {
+            squares.forEach(square => {
+                square.textContent = '';
+                square.classList.remove('correct', 'wrong', 'hidden');
+            });
+            currentWord = '';
+            currentLetters = [];
+            createWords();  // Restore shuffled words
+        }
+
+        // Initialize the game
+        createWords();
+    </script>
+</body>
+</html>
